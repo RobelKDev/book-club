@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}The Reading Room{% endblock %} &middot; Legimus Ergo Sumus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="bookplate">
+  <div class="plate-inner">
+    <div class="motto">Legimus ergo sumus</div>
+    <div class="motto-sub">we read, therefore we are</div>
+    <nav class="topnav">
+      <a href="{{ url_for('index') }}">Reading Room</a>
+      <span class="nav-sep">&middot;</span>
+      <a href="{{ url_for('library') }}">Library</a>
+      {% if me %}
+      <span class="nav-sep">&middot;</span>
+      <a href="{{ url_for('identity') }}" class="reader-link">&#10086; {{ me.name }} &mdash; change</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="flashes" role="status">
+      {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer>
+  <div class="ornament"><span>&#10086;</span></div>
+  <p class="colophon">A private club of two &mdash; New York &amp; Addis Ababa</p>
+</footer>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

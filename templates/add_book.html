@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Shelve a book{% endblock %}
+{% block content %}
+<section class="card">
+  <p class="kicker">A new volume</p>
+  <h1>Shelve a book</h1>
+  <p class="lede">Name the next world you will walk through together, chapter by chapter.</p>
+  <form method="post" class="stack-form">
+    <div class="field">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" required maxlength="200" placeholder="e.g. The Brothers Karamazov" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="author">Author</label>
+      <input type="text" id="author" name="author" maxlength="200" placeholder="e.g. Fyodor Dostoevsky" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="chapters_total">Number of chapters</label>
+      <input type="number" id="chapters_total" name="chapters_total" required min="1" max="500" inputmode="numeric" placeholder="e.g. 12">
+    </div>
+    <fieldset class="field">
+      <legend>Recommended by</legend>
+      <div class="radio-row">
+        {% for m in members %}
+        <label class="radio-pill">
+          <input type="radio" name="recommended_by" value="{{ m.id }}" {% if m.id == default_recommender.id %}checked{% endif %}>
+          <span>{{ m.name }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="fineprint">It is {{ default_recommender.name }}&rsquo;s turn to choose &mdash; change it if you like.</p>
+    </fieldset>
+    <button type="submit" class="btn">Place it on the shelf</button>
+  </form>
+</section>
+{% endblock %}

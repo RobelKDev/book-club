@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: reading-room-book-club
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        # Entered at deploy time in the Render dashboard (the internal
+        # connection string of your free Postgres instance), never committed.
+        # When set, the app uses Postgres; when unset, it falls back to
+        # local SQLite.
+        sync: false
+# Persistence story on the free tier: Render's filesystem is ephemeral, so
+# the old SQLite file (DATABASE_PATH) would be wiped on every redeploy.
+# Instead, provision Render's free Postgres and paste its Internal Database
+# URL into the DATABASE_URL env var above. Free Postgres keeps the data
+# safe across deploys and restarts. (A persistent disk is NOT used here
+# because disks require a paid instance type.)

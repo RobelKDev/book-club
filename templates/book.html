@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }}{% endblock %}
+{% block content %}
+
+<section class="card book-head">
+  <p class="kicker">{% if book.status == 'completed' %}Finished volume{% else %}Now reading{% endif %}</p>
+  <h1 class="book-title">{{ book.title }}</h1>
+  <p class="book-author">{{ book.author }}</p>
+  <p class="book-meta">Chosen by {{ recommender }} &middot; {{ book.chapters_total }} chapters</p>
+</section>
+
+{% if finished_all and not my_submitted %}
+<section class="card essay-prompt">
+  <h2>You have turned the final page.</h2>
+  <p class="lede">Before the discussion begins, chew into the book &mdash; set down your essay below, in your own words and at your own pace.</p>
+  <div class="ornament"><span>&#10086;</span></div>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2 class="section-title">Chapters</h2>
+  <p class="rule-note">The rule of the club: a chapter opens only when <em>both</em> readers have finished the one before it.</p>
+  <ol class="chapter-list">
+    {% for c in chapters %}
+    <li class="chapter chapter-{{ c.state }}">
+      <div class="chapter-row">
+        <span class="chapter-numeral">{{ c.n | roman }}</span>
+        <span class="chapter-checks">
+          {% for m in members %}
+          <span class="check {% if c.done[m.id] %}on{% endif %}" title="{{ m.name }}">{{ m.name[0] }}{% if c.done[m.id] %}&#10003;{% endif %}</span>
+          {% endfor %}
+        </span>
+        {% if c.state == 'available' %}
+        <form method="post" action="{{ url_for('complete_chapter', book_id=book.id) }}" class="chapter-action">
+          <button type="submit" class="btn btn-small">Mark Chapter {{ c.n | roman }} complete</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if c.state == 'locked' %}
+      <p class="chapter-note">&#10086; Patience, reader &mdash; Chapter {{ c.n | roman }} shall open when {{ c.blockers | join(' and ') }} {{ 'finishes' if c.blockers | length == 1 else 'finish' }} Chapter {{ (c.n - 1) | roman }}.</p>
+      {% endif %}
+
+      {% if c.state in ('done', 'available') %}
+      <div class="marginalia">
+        <label for="note-{{ c.n }}">Marginalia &mdash; your private notes on Chapter {{ c.n | roman }}</label>
+        <textarea id="note-{{ c.n }}" class="autosave" data-url="{{ url_for('save_chapter_note', book_id=book.id) }}" data-chapter="{{ c.n }}" rows="3" placeholder="A line that struck you, a question, a quarrel with the author&hellip;">{{ notes.get(c.n, '') }}</textarea>
+        <span class="save-hint" aria-live="polite"></span>
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="card">
+  <h2 class="section-title">Reading journal</h2>
+  <p class="rule-note">Your private notes on the book as a whole &mdash; no one else can read them.</p>
+  <label class="visually-hidden" for="book-note">Your notes on the book</label>
+  <textarea id="book-note" class="autosave" data-url="{{ url_for('save_book_note', book_id=book.id) }}" rows="5" placeholder="Threads to pull, passages to return to&hellip;">{{ book_note }}</textarea>
+  <span class="save-hint" aria-live="polite"></span>
+</section>
+
+<section class="card" id="essay">
+  <h2 class="section-title">Chew into it &mdash; your essay</h2>
+  {% if my_submitted and not edit_essay %}
+    <div class="essay-body dropcap">
+      {% for para in my_essay.text.split('\n\n') %}
+        {% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+      {% endfor %}
+    </div>
+    <p class="fineprint">Sealed {{ my_essay.submitted_at[:10] }}. <a class="text-link" href="{{ url_for('book_detail', book_id=book.id, edit=1) }}#essay">Revise it</a></p>
+    {% if not both_submitted %}
+    <p class="chapter-note">&#10086; {{ partner.name }}&rsquo;s words remain sealed until your partner&rsquo;s essay is complete as well &mdash; no spoilers shall pass.</p>
+    {% endif %}
+  {% else %}
+    <p class="rule-note">Digest the book and set it down in your own words. Your draft saves itself as you write; sealing it is final-ish (you may still revise).</p>
+    <form method="post" action="{{ url_for('essay', book_id=book.id) }}" id="essay-form">
+      <input type="hidden" name="action" id="essay-action" value="save">
+      <label class="visually-hidden" for="essay-text">Your essay</label>
+      <textarea id="essay-text" name="text" rows="10" placeholder="What did the book do to you? What will you carry from it?">{{ my_essay.text if my_essay else '' }}</textarea>
+      <span class="save-hint" aria-live="polite" id="essay-hint"></span>
+      <button type="submit" class="btn" onclick="document.getElementById('essay-action').value='submit';">Seal the essay</button>
+    </form>
+    {% if not both_submitted and partner_submitted %}
+    <p class="chapter-note">&#10086; {{ partner.name }} has sealed {{ 'his' if partner.name == 'Robel' else 'her' }} essay. Yours is the last word awaited.</p>
+    {% endif %}
+  {% endif %}
+
+  {% if both_submitted and partner_essay %}
+  <div class="ornament"><span>&#10086;</span></div>
+  <h3 class="section-title">{{ partner.name }}&rsquo;s essay</h3>
+  <div class="essay-body dropcap">
+    {% for para in partner_essay.text.split('\n\n') %}
+      {% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      var args = arguments, self = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(self, args); }, ms);
+    };
+  }
+
+  document.querySelectorAll('textarea.autosave').forEach(function (ta) {
+    var hint = ta.parentElement.querySelector('.save-hint');
+    var save = debounce(function () {
+      var fd = new FormData();
+      fd.append('text', ta.value);
+      if (ta.dataset.chapter) { fd.append('chapter', ta.dataset.chapter); }
+      if (hint) { hint.textContent = '\u270e writing\u2026'; }
+      fetch(ta.dataset.url, {method: 'POST', body: fd, credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (hint) {
+            hint.textContent = d.ok ? '\u2713 kept' : 'could not keep \u2014 try again';
+            setTimeout(function () { hint.textContent = ''; }, 2500);
+          }
+        })
+        .catch(function () {
+          if (hint) { hint.textContent = 'could not keep \u2014 try again'; }
+        });
+    }, 800);
+    ta.addEventListener('input', save);
+  });
+
+  // Essay draft autosave
+  var essayText = document.getElementById('essay-text');
+  var essayHint = document.getElementById('essay-hint');
+  var essayForm = document.getElementById('essay-form');
+  if (essayText && essayForm) {
+    var saveDraft = debounce(function () {
+      var fd = new FormData();
+      fd.append('action', 'save');
+      fd.append('text', essayText.value);
+      if (essayHint) { essayHint.textContent = '\u270e writing\u2026'; }
+      fetch(essayForm.action, {method: 'POST', body: fd, credentials: 'same-origin'})
+        .then(function () {
+          if (essayHint) {
+            essayHint.textContent = '\u2713 draft kept';
+            setTimeout(function () { essayHint.textContent = ''; }, 2500);
+          }
+        })
+        .catch(function () {
+          if (essayHint) { essayHint.textContent = 'could not keep \u2014 try again'; }
+        });
+    }, 1200);
+    essayText.addEventListener('input', saveDraft);
+  }
+})();
+</script>
+{% endblock %}

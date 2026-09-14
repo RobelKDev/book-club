@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Reading Room{% endblock %}
+{% block content %}
+
+<section class="clocks card">
+  <div class="clock">
+    <div class="clock-city">New York</div>
+    <div class="clock-time" id="clock-ny">&mdash;</div>
+  </div>
+  <div class="clock-divider">&#10086;</div>
+  <div class="clock">
+    <div class="clock-city">Addis Ababa</div>
+    <div class="clock-time" id="clock-addis">&mdash;</div>
+  </div>
+  <p class="clock-note">Miles apart, chapter by chapter.</p>
+</section>
+
+{% if current %}
+<section class="card current-book">
+  <p class="kicker">Now reading</p>
+  <h1 class="book-title"><a href="{{ url_for('book_detail', book_id=current.book.id) }}">{{ current.book.title }}</a></h1>
+  <p class="book-author">{{ current.book.author }}</p>
+  <p class="book-meta">Chosen by {{ current.recommender }} &middot; {{ current.total }} chapters</p>
+
+  <div class="progress-duo">
+    {% for p in current.progress %}
+    <div class="reader-progress">
+      <div class="reader-progress-head"><span>{{ p.name }}</span><span>{{ p.done }} / {{ current.total }}</span></div>
+      <div class="bar"><div class="bar-fill" style="width: {{ p.pct }}%"></div></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="essay-status">
+    <span class="kicker">Essays</span>
+    {% for name, done in current.essays.items() %}
+    <span class="essay-chip {% if done %}done{% endif %}">{{ name }} {% if done %}&#10003;{% else %}&middot;&middot;&middot;{% endif %}</span>
+    {% endfor %}
+  </div>
+
+  <a class="btn" href="{{ url_for('book_detail', book_id=current.book.id) }}">Open the book</a>
+</section>
+
+{% if other_reading %}
+<section class="card">
+  <p class="kicker">Also on the shelf</p>
+  <ul class="plain-list">
+    {% for b in other_reading %}
+    <li><a href="{{ url_for('book_detail', book_id=b.id) }}">{{ b.title }}</a> <span class="muted">&mdash; {{ b.author }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% else %}
+<section class="card empty-shelf">
+  <h1>The shelf is bare.</h1>
+  <p class="lede">No book is open at the moment. Let the next chapter of the club begin &mdash; shelve your first volume.</p>
+  <a class="btn" href="{{ url_for('add_book') }}">Shelve a book</a>
+</section>
+{% endif %}
+
+<section class="card turn-card">
+  <p class="kicker">The turn to choose</p>
+  <p class="turn-line">It is <strong>{{ next_recommender.name }}&rsquo;s</strong> turn to recommend the next book.</p>
+  <a class="btn btn-ghost" href="{{ url_for('add_book') }}">Recommend a book</a>
+</section>
+
+{% if completed %}
+<section class="card">
+  <p class="kicker">Finished volumes</p>
+  <ul class="plain-list">
+    {% for b in completed %}
+    <li><a href="{{ url_for('library') }}#book-{{ b.id }}">{{ b.title }}</a> <span class="muted">&mdash; {{ b.author }}</span></li>
+    {% endfor %}
+  </ul>
+  <a class="text-link" href="{{ url_for('library') }}">Enter the library &rarr;</a>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function tick() {
+  var opts = {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true};
+  try {
+    document.getElementById('clock-ny').textContent =
+      new Intl.DateTimeFormat('en-US', Object.assign({timeZone: 'America/New_York'}, opts)).format(new Date());
+    document.getElementById('clock-addis').textContent =
+      new Intl.DateTimeFormat('en-US', Object.assign({timeZone: 'Africa/Addis_Ababa'}, opts)).format(new Date());
+  } catch (e) { /* older browsers: leave dashes */ }
+}
+tick();
+setInterval(tick, 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Who is reading?{% endblock %}
+{% block content %}
+<section class="gate">
+  <h1>Who is reading?</h1>
+  <p class="lede">Two readers, one shelf. Name yourself, and the room will remember you.</p>
+  <form method="post" class="gate-form">
+    {% for m in members %}
+    <button type="submit" name="member_id" value="{{ m.id }}" class="btn btn-giant">{{ m.name }}</button>
+    {% endfor %}
+  </form>
+  <div class="ornament"><span>&#10086;</span></div>
+  <p class="fineprint">This club admits exactly two members and asks for no passwords &mdash; only honesty.</p>
+</section>
+{% endblock %}

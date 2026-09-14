@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Library{% endblock %}
+{% block content %}
+
+<section class="card library-head">
+  <p class="kicker">The library</p>
+  <h1>Finished volumes</h1>
+  <p class="lede">Every book here was read in lockstep and chewed into by both readers. The essays below were revealed only once both were sealed &mdash; no spoilers ever crossed.</p>
+</section>
+
+{% if books %}
+  {% for b in books %}
+  <article class="card library-book" id="book-{{ b.id }}">
+    <p class="kicker">Volume {{ loop.revindex | roman }}</p>
+    <h2 class="book-title">{{ b.title }}</h2>
+    <p class="book-author">{{ b.author }}</p>
+    <div class="ornament"><span>&#10086;</span></div>
+    <div class="essay-duo">
+      {% for m in members %}
+      <div class="essay-col">
+        <h3 class="essay-byline">{{ m.name }}&rsquo;s essay</h3>
+        <div class="essay-body dropcap">
+          {% set e = essays[b.id].get(m.id) %}
+          {% if e and e.text %}
+            {% for para in e.text.split('\n\n') %}
+              {% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+            {% endfor %}
+          {% else %}
+            <p class="muted"><em>No essay kept.</em></p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+  {% endfor %}
+{% else %}
+<section class="card empty-shelf">
+  <h1>No finished volumes yet.</h1>
+  <p class="lede">The library waits. Finish a book together &mdash; essays and all &mdash; and it will rest here.</p>
+  <a class="btn" href="{{ url_for('index') }}">Return to the reading room</a>
+</section>
+{% endif %}
+
+{% endblock %}
