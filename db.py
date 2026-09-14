@@ -79,30 +79,6 @@ _MEMBER_SEED = (
     else "INSERT OR IGNORE INTO members (name) VALUES (?)"
 )
 
-# Lightweight migrations applied after the base schema. Each runs inside a
-# savepoint-guarded attempt: already-applied migrations are ignored.
-_MIGRATIONS = (
-    "ALTER TABLE books ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''",
-)
-
-
-def _apply_migrations(db):
-    for i, stmt in enumerate(_MIGRATIONS):
-        sp = f"migrate_{i}"
-        try:
-            db.execute(f"SAVEPOINT {sp}")
-            db.execute(stmt)
-            db.execute(f"RELEASE SAVEPOINT {sp}")
-        except Exception as exc:  # noqa: BLE001 - idempotency check below
-            try:
-                db.execute(f"ROLLBACK TO SAVEPOINT {sp}")
-            except Exception:  # noqa: BLE001 - best effort cleanup
-                pass
-            msg = str(exc).lower()
-            if "duplicate" in msg or "already exists" in msg:
-                continue
-            raise
-
 
 class _Cursor:
     """Wraps a DB-API cursor: translates ``?`` -> ``%s`` on Postgres."""
@@ -193,7 +169,6 @@ def init_db():
         db.executescript(SCHEMA)
         for name in ("Robel", "Bitania"):
             db.execute(_MEMBER_SEED, (name,))
-        _apply_migrations(db)
         db.commit()
     finally:
         db.close()

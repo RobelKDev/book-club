@@ -18,16 +18,9 @@
 {% if current %}
 <section class="card current-book">
   <p class="kicker">Now reading</p>
-  <div class="book-hero">
-    {% if current.book.cover_url %}
-    <img class="cover" src="{{ current.book.cover_url }}" alt="Cover of {{ current.book.title }}" loading="lazy">
-    {% endif %}
-    <div class="book-hero-text">
-      <h1 class="book-title"><a href="{{ url_for('book_detail', book_id=current.book.id) }}">{{ current.book.title }}</a></h1>
-      <p class="book-author">{{ current.book.author }}</p>
-      <p class="book-meta">Chosen by {{ current.recommender }} &middot; {{ current.total }} chapters</p>
-    </div>
-  </div>
+  <h1 class="book-title"><a href="{{ url_for('book_detail', book_id=current.book.id) }}">{{ current.book.title }}</a></h1>
+  <p class="book-author">{{ current.book.author }}</p>
+  <p class="book-meta">Chosen by {{ current.recommender }} &middot; {{ current.total }} chapters</p>
 
   <div class="progress-duo">
     {% for p in current.progress %}

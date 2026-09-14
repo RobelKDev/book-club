@@ -4,16 +4,9 @@
 
 <section class="card book-head">
   <p class="kicker">{% if book.status == 'completed' %}Finished volume{% else %}Now reading{% endif %}</p>
-  <div class="book-hero">
-    {% if book.cover_url %}
-    <img class="cover" src="{{ book.cover_url }}" alt="Cover of {{ book.title }}" loading="lazy">
-    {% endif %}
-    <div class="book-hero-text">
-      <h1 class="book-title">{{ book.title }}</h1>
-      <p class="book-author">{{ book.author }}</p>
-      <p class="book-meta">Chosen by {{ recommender }} &middot; {{ book.chapters_total }} chapters</p>
-    </div>
-  </div>
+  <h1 class="book-title">{{ book.title }}</h1>
+  <p class="book-author">{{ book.author }}</p>
+  <p class="book-meta">Chosen by {{ recommender }} &middot; {{ book.chapters_total }} chapters</p>
 </section>
 
 {% if finished_all and not my_submitted %}
@@ -24,13 +17,7 @@
 </section>
 {% endif %}
 
-<nav class="tabs" aria-label="Sections of this book">
-  <button type="button" class="tab is-active" data-tab="chapters" role="tab" aria-selected="true" aria-controls="panel-chapters" id="tab-chapters">Chapters</button>
-  <button type="button" class="tab" data-tab="journal" role="tab" aria-selected="false" aria-controls="panel-journal" id="tab-journal">Journal</button>
-  <button type="button" class="tab" data-tab="essay" role="tab" aria-selected="false" aria-controls="essay" id="tab-essay">Essay</button>
-</nav>
-
-<section class="card tab-panel is-active" id="panel-chapters" role="tabpanel" aria-labelledby="tab-chapters">
+<section class="card">
   <h2 class="section-title">Chapters</h2>
   <p class="rule-note">The rule of the club: a chapter opens only when <em>both</em> readers have finished the one before it.</p>
   <ol class="chapter-list">
@@ -65,7 +52,7 @@
   </ol>
 </section>
 
-<section class="card tab-panel" id="panel-journal" role="tabpanel" aria-labelledby="tab-journal">
+<section class="card">
   <h2 class="section-title">Reading journal</h2>
   <p class="rule-note">Your private notes on the book as a whole &mdash; no one else can read them.</p>
   <label class="visually-hidden" for="book-note">Your notes on the book</label>
@@ -73,7 +60,7 @@
   <span class="save-hint" aria-live="polite"></span>
 </section>
 
-<section class="card tab-panel" id="essay" role="tabpanel" aria-labelledby="tab-essay">
+<section class="card" id="essay">
   <h2 class="section-title">Chew into it &mdash; your essay</h2>
   {% if my_submitted and not edit_essay %}
     <div class="essay-body dropcap">
@@ -169,61 +156,6 @@
     }, 1200);
     essayText.addEventListener('input', saveDraft);
   }
-})();
-
-// Tabs: one section of the book visible at a time.
-(function () {
-  var nav = document.querySelector('.tabs');
-  if (!nav) return;
-  document.body.classList.add('has-tabs');
-  var names = ['chapters', 'journal', 'essay'];
-  var tabs = {}, panels = {};
-  names.forEach(function (n) {
-    tabs[n] = nav.querySelector('[data-tab="' + n + '"]');
-    panels[n] = document.getElementById(n === 'essay' ? 'essay' : 'panel-' + n);
-  });
-  function activate(name, remember) {
-    if (!tabs[name]) name = 'chapters';
-    names.forEach(function (n) {
-      var on = n === name;
-      tabs[n].classList.toggle('is-active', on);
-      tabs[n].setAttribute('aria-selected', on ? 'true' : 'false');
-      if (panels[n]) panels[n].classList.toggle('is-active', on);
-    });
-    if (remember !== false) {
-      try { sessionStorage.setItem('bookclub.tab', name); } catch (e) {}
-    }
-    if (history.replaceState) history.replaceState(null, '', '#' + name);
-  }
-  nav.addEventListener('click', function (e) {
-    var b = e.target.closest('.tab');
-    if (b && b.dataset.tab) activate(b.dataset.tab);
-  });
-  window.addEventListener('hashchange', function () {
-    var h = location.hash.replace('#', '');
-    if (names.indexOf(h) !== -1) activate(h);
-  });
-  var initial = 'chapters';
-  var h = location.hash.replace('#', '');
-  if (names.indexOf(h) !== -1) {
-    initial = h;
-  } else {
-    try {
-      var saved = sessionStorage.getItem('bookclub.tab');
-      if (names.indexOf(saved) !== -1) initial = saved;
-    } catch (e) {}
-    var flash = document.querySelector('.flashes');
-    if (flash && /chew into the book/i.test(flash.textContent)) initial = 'essay';
-    try { sessionStorage.removeItem('bookclub.tab'); } catch (e) {}
-  }
-  activate(initial, false);
-  // Survive the chapter-complete round-trip on the same tab.
-  document.querySelectorAll('form.chapter-action').forEach(function (f) {
-    f.addEventListener('submit', function () {
-      var active = nav.querySelector('.tab.is-active');
-      try { sessionStorage.setItem('bookclub.tab', active ? active.dataset.tab : 'chapters'); } catch (e) {}
-    });
-  });
 })();
 </script>
 {% endblock %}
