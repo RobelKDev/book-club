@@ -4,15 +4,60 @@
 <section class="card">
   <p class="kicker">A new volume</p>
   <h1>Shelve a book</h1>
-  <p class="lede">Name the next world you will walk through together, chapter by chapter.</p>
+  <p class="lede">Look the book up and its cover comes along &mdash; or enter it by hand below.</p>
+  <form method="get" action="{{ url_for('add_book') }}" class="lookup-form">
+    <div class="field">
+      <label for="q">Find the book</label>
+      <div class="lookup-row">
+        <input type="text" id="q" name="q" value="{{ lookup_q }}" maxlength="200" placeholder="e.g. The Secret History Donna Tartt" autocomplete="off">
+        <button type="submit" class="btn btn-small">Look up</button>
+      </div>
+    </div>
+  </form>
+
+  {% if lookup_failed %}
+  <p class="muted"><em>The book lookup is unreachable right now &mdash; enter the book by hand below.</em></p>
+  {% elif lookup_q %}
+    {% if lookup_results %}
+    <div class="lookup-results">
+      {% for r in lookup_results %}
+      <article class="result-card">
+        {% if r.thumb_url %}
+        <img class="result-cover" src="{{ r.thumb_url }}" alt="Cover of {{ r.title }}" loading="lazy">
+        {% else %}
+        <div class="result-cover cover-missing"><span>&#10086;</span></div>
+        {% endif %}
+        <div class="result-info">
+          <h3 class="result-title">{{ r.title }}</h3>
+          <p class="result-author">{{ r.author }}{% if r.year %} &middot; {{ r.year }}{% endif %}</p>
+          <a class="btn btn-small btn-ghost" href="{{ url_for('add_book', title=r.title, author=r.author, cover_url=r.cover_url) }}">Use this</a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted"><em>No matches for &ldquo;{{ lookup_q }}&rdquo; &mdash; enter the book by hand below.</em></p>
+    {% endif %}
+  {% endif %}
+</section>
+
+<section class="card">
+  <p class="kicker">By hand</p>
+  <h2 class="section-title">The details</h2>
   <form method="post" class="stack-form">
+    {% if prefill.cover_url %}
+    <div class="cover-preview">
+      <img src="{{ prefill.cover_url }}" alt="Chosen cover" loading="lazy">
+    </div>
+    {% endif %}
+    <input type="hidden" name="cover_url" value="{{ prefill.cover_url }}">
     <div class="field">
       <label for="title">Title</label>
-      <input type="text" id="title" name="title" required maxlength="200" placeholder="e.g. The Brothers Karamazov" autocomplete="off">
+      <input type="text" id="title" name="title" required maxlength="200" value="{{ prefill.title }}" placeholder="e.g. The Brothers Karamazov" autocomplete="off">
     </div>
     <div class="field">
       <label for="author">Author</label>
-      <input type="text" id="author" name="author" maxlength="200" placeholder="e.g. Fyodor Dostoevsky" autocomplete="off">
+      <input type="text" id="author" name="author" maxlength="200" value="{{ prefill.author }}" placeholder="e.g. Fyodor Dostoevsky" autocomplete="off">
     </div>
     <div class="field">
       <label for="chapters_total">Number of chapters</label>

@@ -10,7 +10,10 @@ only once BOTH members have completed chapter k-1. So each reader's
 """
 
 import hmac
+import json
 import os
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from flask import (
@@ -134,6 +137,65 @@ def get_book_or_404(book_id):
     if book is None:
         abort(404)
     return book
+
+
+_OL_SEARCH_URL = "https://openlibrary.org/search.json"
+
+
+def search_books_online(query, limit=6):
+    """Look up books on Open Library.
+
+    Returns a list of dicts (title, author, year, cover_url, thumb_url),
+    an empty list when nothing matches, or None when the lookup itself
+    failed (network down, service error) so callers can fall back to
+    manual entry.
+    """
+    query = (query or "").strip()
+    if not query:
+        return []
+    try:
+        params = urllib.parse.urlencode({
+            "q": query,
+            "limit": limit,
+            "fields": "key,title,author_name,first_publish_year,cover_i",
+        })
+        req = urllib.request.Request(
+            _OL_SEARCH_URL + "?" + params,
+            headers={"User-Agent": "ReadingRoomBookClub/1.0 (two-person book club)"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.load(resp)
+    except Exception:  # noqa: BLE001 - any lookup failure -> manual fallback
+        return None
+    results = []
+    for doc in data.get("docs", [])[:limit]:
+        cover_i = doc.get("cover_i")
+        authors = doc.get("author_name") or []
+        results.append({
+            "title": doc.get("title") or "Untitled",
+            "author": ", ".join(authors[:3]),
+            "year": doc.get("first_publish_year"),
+            "cover_url": (
+                f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+                if cover_i else ""
+            ),
+            "thumb_url": (
+                f"https://covers.openlibrary.org/b/id/{cover_i}-M.jpg"
+                if cover_i else ""
+            ),
+        })
+    return results
+
+
+def clean_cover_url(value):
+    """Keep only sane http(s) cover URLs; drop anything else."""
+    value = (value or "").strip()
+    if len(value) > 500:
+        return ""
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+    return value
 
 
 def next_recommender():
@@ -275,9 +337,28 @@ def add_book():
     members = members_list()
     default_recommender = next_recommender()
 
+    # Web lookup (Open Library) shown above the manual form.
+    lookup_q = (request.args.get("q") or "").strip()
+    lookup_results = []
+    lookup_failed = False
+    if lookup_q and request.method == "GET":
+        found = search_books_online(lookup_q)
+        if found is None:
+            lookup_failed = True
+        else:
+            lookup_results = found
+
+    # Prefill from a chosen lookup result ("Use this" links pass these back).
+    prefill = {
+        "title": (request.args.get("title") or "").strip()[:200],
+        "author": (request.args.get("author") or "").strip()[:200],
+        "cover_url": clean_cover_url(request.args.get("cover_url")),
+    }
+
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
         author = (request.form.get("author") or "").strip()
+        cover_url = clean_cover_url(request.form.get("cover_url"))
         try:
             chapters_total = int(request.form.get("chapters_total", 0))
         except (TypeError, ValueError):
@@ -297,9 +378,9 @@ def add_book():
         else:
             book_id = insert_returning_id(
                 db,
-                """INSERT INTO books (title, author, chapters_total, recommended_by, status, created_at)
-                   VALUES (?, ?, ?, ?, 'reading', ?)""",
-                (title, author, chapters_total, recommended_by, now_iso()),
+                """INSERT INTO books (title, author, chapters_total, recommended_by, status, created_at, cover_url)
+                   VALUES (?, ?, ?, ?, 'reading', ?, ?)""",
+                (title, author, chapters_total, recommended_by, now_iso(), cover_url),
             )
             for m in members:
                 db.execute(
@@ -309,9 +390,17 @@ def add_book():
             db.commit()
             flash(f"\u2756 {title} rests on the shelf. Read in lockstep, you two.")
             return redirect(url_for("book_detail", book_id=book_id))
+        # On validation failure, keep what was typed.
+        prefill = {"title": title, "author": author, "cover_url": cover_url}
 
     return render_template(
-        "add_book.html", members=members, default_recommender=default_recommender
+        "add_book.html",
+        members=members,
+        default_recommender=default_recommender,
+        lookup_q=lookup_q,
+        lookup_results=lookup_results,
+        lookup_failed=lookup_failed,
+        prefill=prefill,
     )
 
 
