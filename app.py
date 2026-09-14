@@ -9,6 +9,7 @@ only once BOTH members have completed chapter k-1. So each reader's
 "current chapter" is min(both members' completed chapters) + 1.
 """
 
+import hmac
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -64,10 +65,32 @@ def now_iso():
 
 
 def current_member():
+    # A session only counts as logged in once the passcode gate has been
+    # passed (session["authed"]). Cookies minted before the passcode gate
+    # existed carry member_id without authed and are treated as logged out.
+    if not session.get("authed"):
+        return None
     mid = session.get("member_id")
     if not mid:
         return None
     return get_db().execute("SELECT * FROM members WHERE id = ?", (mid,)).fetchone()
+
+
+def passcode_for(member):
+    """The expected passcode for a member, from the environment.
+
+    PASSCODE_<NAME> (e.g. PASSCODE_ROBEL). Returns None when unset, in
+    which case login is denied (fail closed).
+    """
+    expected = os.environ.get(f"PASSCODE_{member['name'].upper()}")
+    return expected if expected else None
+
+
+def passcode_ok(member, given):
+    expected = passcode_for(member)
+    if not expected or not given:
+        return False
+    return hmac.compare_digest(given, expected)
 
 
 def members_list():
@@ -147,10 +170,35 @@ def identity():
         if member is None:
             flash("Choose one of the two readers, dear stranger.")
             return redirect(url_for("identity"))
-        session["member_id"] = member["id"]
-        session.permanent = True
-        return redirect(url_for("index"))
+        # Name chosen; the passcode itself is verified on /login.
+        session["pending_member_id"] = member["id"]
+        return redirect(url_for("login"))
     return render_template("identity.html", members=members_list())
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    member = None
+    pid = session.get("pending_member_id")
+    if pid:
+        member = get_db().execute(
+            "SELECT * FROM members WHERE id = ?", (pid,)
+        ).fetchone()
+    if member is None:
+        return redirect(url_for("identity"))
+    if request.method == "POST":
+        given = (request.form.get("passcode") or "").strip()
+        if passcode_for(member) is None:
+            flash("The room has no passcode set for this reader yet.")
+        elif passcode_ok(member, given):
+            session.pop("pending_member_id", None)
+            session["member_id"] = member["id"]
+            session["authed"] = True
+            session.permanent = True
+            return redirect(url_for("index"))
+        else:
+            flash("That passcode does not open this reader's door.")
+    return render_template("login.html", member=member)
 
 
 # --------------------------------------------------------------------------- #

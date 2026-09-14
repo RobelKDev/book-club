@@ -26,7 +26,7 @@ Concretely, each reader's current chapter is `min(both members' completed chapte
 
 ## Identity model
 
-There are exactly two members, seeded as **Robel** and **Bitania**. The first screen asks *"Who is reading?"* — the choice is remembered in a long-lived signed cookie. **There are no passwords** by design: this is a private club of two, not a public service. Don't expose it to the open internet without adding authentication in front of it (or keep the URL unlisted and private).
+There are exactly two members, seeded as **Robel** and **Bitania**. The first screen asks *"Who is reading?"* — pick your name, enter your private passcode (set via the `PASSCODE_ROBEL` / `PASSCODE_BITANIA` environment variables, never committed), and the choice is remembered in a long-lived signed cookie. Keep the URL unlisted and private all the same.
 
 ## Tech
 
