@@ -14,6 +14,12 @@ services:
         # When set, the app uses Postgres; when unset, it falls back to
         # local SQLite.
         sync: false
+      - key: PASSCODE_ROBEL
+        # Robel's login passcode. Entered at deploy time, never committed.
+        sync: false
+      - key: PASSCODE_BITANIA
+        # Bitania's login passcode. Entered at deploy time, never committed.
+        sync: false
 # Persistence story on the free tier: Render's filesystem is ephemeral, so
 # the old SQLite file (DATABASE_PATH) would be wiped on every redeploy.
 # Instead, provision Render's free Postgres and paste its Internal Database
