@@ -12,8 +12,15 @@
   {% for b in books %}
   <article class="card library-book" id="book-{{ b.id }}">
     <p class="kicker">Volume {{ loop.revindex | roman }}</p>
-    <h2 class="book-title">{{ b.title }}</h2>
-    <p class="book-author">{{ b.author }}</p>
+    <div class="book-hero">
+      {% if b.cover_url %}
+      <img class="cover cover-small" src="{{ b.cover_url }}" alt="Cover of {{ b.title }}" loading="lazy">
+      {% endif %}
+      <div class="book-hero-text">
+        <h2 class="book-title">{{ b.title }}</h2>
+        <p class="book-author">{{ b.author }}</p>
+      </div>
+    </div>
     <div class="ornament"><span>&#10086;</span></div>
     <div class="essay-duo">
       {% for m in members %}

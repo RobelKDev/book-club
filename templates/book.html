@@ -4,9 +4,16 @@
 
 <section class="card book-head">
   <p class="kicker">{% if book.status == 'completed' %}Finished volume{% else %}Now reading{% endif %}</p>
-  <h1 class="book-title">{{ book.title }}</h1>
-  <p class="book-author">{{ book.author }}</p>
-  <p class="book-meta">Chosen by {{ recommender }} &middot; {{ book.chapters_total }} chapters</p>
+  <div class="book-hero">
+    {% if book.cover_url %}
+    <img class="cover" src="{{ book.cover_url }}" alt="Cover of {{ book.title }}" loading="lazy">
+    {% endif %}
+    <div class="book-hero-text">
+      <h1 class="book-title">{{ book.title }}</h1>
+      <p class="book-author">{{ book.author }}</p>
+      <p class="book-meta">Chosen by {{ recommender }} &middot; {{ book.chapters_total }} chapters</p>
+    </div>
+  </div>
 </section>
 
 {% if finished_all and not my_submitted %}
