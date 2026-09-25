@@ -4,9 +4,10 @@ The Reading Room -- a private two-person book club.
 
 For Robel (New York) and Bitania (Addis Ababa).
 
-The heart of the app is chapter gating: a member may read chapter k
-only once BOTH members have completed chapter k-1. So each reader's
-"current chapter" is min(both members' completed chapters) + 1.
+The club reads whole books: each reader writes one end-of-book essay.
+Essays are spoiler-safe -- a reader's essay is revealed only once both
+readers have sealed theirs, at which point the book moves to the shelf.
+Essay drafts autosave to the backend as they are written.
 """
 
 import hmac
@@ -17,7 +18,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from flask import (
-    Flask, abort, flash, jsonify, redirect, render_template,
+    Flask, abort, flash, redirect, render_template,
     request, session, url_for,
 )
 
@@ -106,23 +107,6 @@ def other_member(me, members=None):
         if m["id"] != me["id"]:
             return m
     return None
-
-
-def progress_map(book_id):
-    rows = get_db().execute(
-        "SELECT member_id, chapters_completed FROM progress WHERE book_id = ?",
-        (book_id,),
-    ).fetchall()
-    return {r["member_id"]: r["chapters_completed"] for r in rows}
-
-
-def gate_chapter(pmap):
-    """The chapter number either reader may next attempt.
-
-    Chapter k opens only when both members completed k-1, so the
-    next open chapter is min(completed) + 1.
-    """
-    return min(pmap.values()) + 1
 
 
 def essays_map(book_id):
@@ -286,9 +270,6 @@ def index():
     current = reading[0] if reading else None
     current_info = None
     if current:
-        pmap = progress_map(current["id"])
-        total = current["chapters_total"]
-        nxt = gate_chapter(pmap)
         emap = essays_map(current["id"])
         recommender = db.execute(
             "SELECT name FROM members WHERE id = ?", (current["recommended_by"],)
@@ -296,16 +277,6 @@ def index():
         current_info = {
             "book": current,
             "recommender": recommender,
-            "total": total,
-            "next": nxt if nxt <= total else None,
-            "progress": [
-                {
-                    "name": m["name"],
-                    "done": pmap.get(m["id"], 0),
-                    "pct": round(100 * pmap.get(m["id"], 0) / total),
-                }
-                for m in members
-            ],
             "essays": {
                 m["name"]: bool(
                     emap.get(m["id"]) and emap[m["id"]]["submitted_at"]
@@ -360,10 +331,6 @@ def add_book():
         author = (request.form.get("author") or "").strip()
         cover_url = clean_cover_url(request.form.get("cover_url"))
         try:
-            chapters_total = int(request.form.get("chapters_total", 0))
-        except (TypeError, ValueError):
-            chapters_total = 0
-        try:
             recommended_by = int(request.form.get("recommended_by", 0))
         except (TypeError, ValueError):
             recommended_by = 0
@@ -371,24 +338,19 @@ def add_book():
         valid_ids = {m["id"] for m in members}
         if not title:
             flash("Every book needs a title.")
-        elif chapters_total < 1:
-            flash("Tell us how many chapters the book holds (at least one).")
         elif recommended_by not in valid_ids:
             flash("Choose who recommended this book.")
         else:
+            # chapters_total is vestigial (whole books now); kept at 1 to
+            # satisfy the legacy NOT NULL / CHECK constraint.
             book_id = insert_returning_id(
                 db,
                 """INSERT INTO books (title, author, chapters_total, recommended_by, status, created_at, cover_url)
-                   VALUES (?, ?, ?, ?, 'reading', ?, ?)""",
-                (title, author, chapters_total, recommended_by, now_iso(), cover_url),
+                   VALUES (?, ?, 1, ?, 'reading', ?, ?)""",
+                (title, author, recommended_by, now_iso(), cover_url),
             )
-            for m in members:
-                db.execute(
-                    "INSERT INTO progress (member_id, book_id, chapters_completed) VALUES (?, ?, 0)",
-                    (m["id"], book_id),
-                )
             db.commit()
-            flash(f"\u2756 {title} rests on the shelf. Read in lockstep, you two.")
+            flash(f"\u2756 {title} rests on the shelf. Read it well, you two.")
             return redirect(url_for("book_detail", book_id=book_id))
         # On validation failure, keep what was typed.
         prefill = {"title": title, "author": author, "cover_url": cover_url}
@@ -417,42 +379,10 @@ def book_detail(book_id):
     book = get_book_or_404(book_id)
     members = members_list()
     partner = other_member(me, members)
-    pmap = progress_map(book["id"])
-    total = book["chapters_total"]
-    nxt = gate_chapter(pmap)
-    my_done = pmap.get(me["id"], 0)
 
-    chapters = []
-    for k in range(1, total + 1):
-        done = {m["id"]: pmap.get(m["id"], 0) >= k for m in members}
-        if k <= my_done:
-            state = "done"
-        elif k == nxt and my_done == nxt - 1:
-            state = "available"  # my turn to read
-        else:
-            state = "locked"
-        blockers = [m["name"] for m in members if pmap.get(m["id"], 0) < k - 1]
-        chapters.append(
-            {
-                "n": k,
-                "done": done,
-                "state": state,
-                "blockers": blockers,
-            }
-        )
-
-    notes = {
-        r["chapter"]: r["text"]
-        for r in db.execute(
-            "SELECT chapter, text FROM chapter_notes WHERE book_id = ? AND member_id = ?",
-            (book_id, me["id"]),
-        ).fetchall()
-    }
-    book_note_row = db.execute(
-        "SELECT text FROM book_notes WHERE book_id = ? AND member_id = ?",
-        (book_id, me["id"]),
-    ).fetchone()
-
+    # One ending essay per reader. States: draft (submitted_at NULL,
+    # autosaved to the backend), sealed (submitted, hidden), revealed
+    # (both sealed).
     emap = essays_map(book_id)
     my_essay = emap.get(me["id"])
     partner_essay = emap.get(partner["id"])
@@ -470,108 +400,22 @@ def book_detail(book_id):
         "book.html",
         book=book,
         recommender=recommender,
-        members=members,
         partner=partner,
-        chapters=chapters,
-        next_chapter=nxt if nxt <= total else None,
-        notes=notes,
-        book_note=book_note_row["text"] if book_note_row else "",
         my_essay=my_essay,
         my_submitted=my_submitted,
         partner_submitted=partner_submitted,
         both_submitted=both_submitted,
         partner_essay=partner_essay if both_submitted else None,
-        finished_all=my_done >= total,
         edit_essay=edit_essay,
     )
 
 
 # --------------------------------------------------------------------------- #
-# Mark a chapter complete (the gating rule lives here)
-# --------------------------------------------------------------------------- #
-
-@app.route("/book/<int:book_id>/complete", methods=["POST"])
-def complete_chapter(book_id):
-    me = current_member()
-    if me is None:
-        return redirect(url_for("identity"))
-    db = get_db()
-    book = get_book_or_404(book_id)
-    pmap = progress_map(book_id)
-    nxt = gate_chapter(pmap)
-    my_done = pmap.get(me["id"], 0)
-
-    # Only the reader who is behind (or tied) may advance, exactly one chapter.
-    if my_done != nxt - 1 or nxt > book["chapters_total"]:
-        flash("That chapter is not yet open to you \u2014 patience, reader.")
-        return redirect(url_for("book_detail", book_id=book_id))
-
-    db.execute(
-        "UPDATE progress SET chapters_completed = ? WHERE book_id = ? AND member_id = ?",
-        (nxt, book_id, me["id"]),
-    )
-    db.commit()
-
-    if nxt == book["chapters_total"]:
-        flash(
-            f"You have turned the final page of Chapter {to_roman(nxt)}. "
-            "Now chew into the book \u2014 write your essay below."
-        )
-    else:
-        flash(f"Chapter {to_roman(nxt)} complete. Well read.")
-    return redirect(url_for("book_detail", book_id=book_id))
-
-
-# --------------------------------------------------------------------------- #
-# Notes (autosaved, private per member)
-# --------------------------------------------------------------------------- #
-
-@app.route("/book/<int:book_id>/chapter-note", methods=["POST"])
-def save_chapter_note(book_id):
-    me = current_member()
-    if me is None:
-        return jsonify({"ok": False, "error": "unknown reader"}), 401
-    book = get_book_or_404(book_id)
-    try:
-        chapter = int(request.form.get("chapter", 0))
-    except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "bad chapter"}), 400
-    if not 1 <= chapter <= book["chapters_total"]:
-        return jsonify({"ok": False, "error": "bad chapter"}), 400
-    text = request.form.get("text", "")
-    db = get_db()
-    db.execute(
-        """INSERT INTO chapter_notes (member_id, book_id, chapter, text, updated_at)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT (member_id, book_id, chapter)
-           DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at""",
-        (me["id"], book_id, chapter, text, now_iso()),
-    )
-    db.commit()
-    return jsonify({"ok": True})
-
-
-@app.route("/book/<int:book_id>/book-note", methods=["POST"])
-def save_book_note(book_id):
-    me = current_member()
-    if me is None:
-        return jsonify({"ok": False, "error": "unknown reader"}), 401
-    get_book_or_404(book_id)
-    text = request.form.get("text", "")
-    db = get_db()
-    db.execute(
-        """INSERT INTO book_notes (member_id, book_id, text, updated_at)
-           VALUES (?, ?, ?, ?)
-           ON CONFLICT (member_id, book_id)
-           DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at""",
-        (me["id"], book_id, text, now_iso()),
-    )
-    db.commit()
-    return jsonify({"ok": True})
-
-
-# --------------------------------------------------------------------------- #
 # Essays (spoiler-safe: revealed only when both are submitted)
+#
+# States per reader: draft (submitted_at NULL, checkpointed to the backend
+# on every write) -> sealed (submitted_at set, hidden) -> revealed (both
+# sealed; the book is complete).
 # --------------------------------------------------------------------------- #
 
 @app.route("/book/<int:book_id>/essay", methods=["POST"])
@@ -583,17 +427,19 @@ def essay(book_id):
     book = get_book_or_404(book_id)
     action = request.form.get("action", "save")
     text = (request.form.get("text") or "").strip()
+    stamp = now_iso()
 
     if action == "submit":
         if not text:
             flash("Write something first \u2014 even a rough paragraph will do.")
             return redirect(url_for("book_detail", book_id=book_id))
         db.execute(
-            """INSERT INTO essays (member_id, book_id, text, submitted_at)
-               VALUES (?, ?, ?, ?)
+            """INSERT INTO essays (member_id, book_id, text, submitted_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)
                ON CONFLICT (member_id, book_id)
-               DO UPDATE SET text = excluded.text, submitted_at = excluded.submitted_at""",
-            (me["id"], book_id, text, now_iso()),
+               DO UPDATE SET text = excluded.text, submitted_at = excluded.submitted_at,
+                             updated_at = excluded.updated_at""",
+            (me["id"], book_id, text, stamp, stamp),
         )
         db.commit()
         both = db.execute(
@@ -605,7 +451,7 @@ def essay(book_id):
             db.commit()
             flash(
                 "Both essays are sealed and revealed \u2014 the book now rests "
-                "complete in your library. \u2766"
+                "complete on your shelf. \u2766"
             )
         else:
             flash(
@@ -613,12 +459,14 @@ def essay(book_id):
                 "is complete as well."
             )
     else:
+        # Checkpoint: persist the draft on every write so nothing is lost.
         db.execute(
-            """INSERT INTO essays (member_id, book_id, text, submitted_at)
-               VALUES (?, ?, ?, NULL)
+            """INSERT INTO essays (member_id, book_id, text, submitted_at, updated_at)
+               VALUES (?, ?, ?, NULL, ?)
                ON CONFLICT (member_id, book_id)
-               DO UPDATE SET text = excluded.text""",
-            (me["id"], book_id, text),
+               DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at
+               WHERE essays.submitted_at IS NULL""",
+            (me["id"], book_id, text, stamp),
         )
         db.commit()
 
@@ -626,11 +474,11 @@ def essay(book_id):
 
 
 # --------------------------------------------------------------------------- #
-# Library of completed books
+# Shelf of completed books
 # --------------------------------------------------------------------------- #
 
-@app.route("/library")
-def library():
+@app.route("/shelf")
+def shelf():
     me = current_member()
     if me is None:
         return redirect(url_for("identity"))
@@ -643,8 +491,14 @@ def library():
     for b in books:
         emap_all[b["id"]] = essays_map(b["id"])
     return render_template(
-        "library.html", books=books, members=members, essays=emap_all
+        "shelf.html", books=books, members=members, essays=emap_all
     )
+
+
+@app.route("/library")
+def library_redirect():
+    # The library was renamed to the shelf; keep the old door working.
+    return redirect(url_for("shelf"))
 
 
 with app.app_context():

@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Library{% endblock %}
+{% block title %}Shelf{% endblock %}
 {% block content %}
 
-<section class="card library-head">
-  <p class="kicker">The library</p>
+<section class="card shelf-head">
+  <p class="kicker">The shelf</p>
   <h1>Finished volumes</h1>
-  <p class="lede">Every book here was read in lockstep and chewed into by both readers. The essays below were revealed only once both were sealed &mdash; no spoilers ever crossed.</p>
+  <p class="lede">Every volume here was read cover to cover and chewed into by both readers. The essays below were revealed only once both were sealed &mdash; no spoilers ever crossed.</p>
 </section>
 
 {% if books %}
   {% for b in books %}
-  <article class="card library-book" id="book-{{ b.id }}">
+  <article class="card shelf-book" id="book-{{ b.id }}">
     <p class="kicker">Volume {{ loop.revindex | roman }}</p>
     <div class="book-hero">
       {% if b.cover_url %}
@@ -44,7 +44,7 @@
 {% else %}
 <section class="card empty-shelf">
   <h1>No finished volumes yet.</h1>
-  <p class="lede">The library waits. Finish a book together &mdash; essays and all &mdash; and it will rest here.</p>
+  <p class="lede">The shelf waits. Finish a book together &mdash; essays and all &mdash; and it will rest here.</p>
   <a class="btn" href="{{ url_for('index') }}">Return to the reading room</a>
 </section>
 {% endif %}

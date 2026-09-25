@@ -2,27 +2,27 @@
 
 A private, two-person book club web app for **Robel** (New York) and **Bitania** (Addis Ababa).
 
-They take turns recommending books, read **chapter by chapter in lockstep**, keep private notes, and each write an end-of-book essay — then discuss. The app enforces the lockstep, guards against spoilers, and is designed phone-first in a Classics / Academic / Poetic style (Cormorant Garamond + EB Garamond, parchment & ink, oxblood & antique gold, Roman numerals, ❦ ornaments, drop caps).
+They take turns recommending books, read each book cover to cover, and each write an end-of-book essay — then discuss. The app guards against spoilers and checkpoints every word of each essay draft to the backend as it is written, and is designed phone-first in a Classics / Academic / Poetic style (Cormorant Garamond + EB Garamond, parchment & ink, oxblood & antique gold, Roman numerals, ❦ ornaments, drop caps).
 
 ## How the club works
 
-1. **Recommend** — members alternate recommending books (the app tells you whose turn it is).
-2. **Read in lockstep** — the chapter-gating rule (below) means nobody reads ahead alone.
-3. **Take notes** — private per-chapter marginalia and a private reading journal, autosaved.
-4. **Chew into it** — when you finish the last chapter, write your end-of-book essay.
-5. **Library** — once *both* essays are sealed, the book moves to the library with both essays revealed side by side.
+1. **Recommend** — members alternate recommending books (a slim ribbon on the dashboard tells you whose turn it is).
+2. **Read** — the whole book, at your own pace. No chapters, no lockstep, no journal.
+3. **Chew into it** — when you finish, write your end-of-book essay. Your draft is checkpointed to the backend on every write (plus a last-chance save when the page closes), so nothing is ever lost.
+4. **Shelf** — once *both* essays are sealed, the book moves to the shelf with both essays revealed side by side.
 
-## The chapter-gating rule (the heart of the app)
+## Essay states
 
-> A member may read chapter *k* only if **both** members have completed chapter *k−1*.
+Each reader's essay moves through three states, tracked per `(member, book)`:
 
-Concretely, each reader's current chapter is `min(both members' completed chapters) + 1`. Completing a chapter is one tap: **"Mark Chapter N complete"**. The button only ever appears on the single open chapter, and only for the reader whose turn it is — if you've read ahead of your partner, the chapter waits on them by name, with a poetic holding message. Locked chapters show who must finish what before they open.
+- **Draft** — `submitted_at` is NULL; the text is checkpointed to the backend on every keystroke pause and again when the page is hidden or closed. `updated_at` records the last checkpoint.
+- **Sealed** — the reader tapped "Seal the essay"; `submitted_at` is set. The text is hidden from the partner, and further draft saves are ignored (a sealed essay can't be overwritten by a draft checkpoint).
+- **Revealed** — both readers have sealed; each can read the other's essay, and the book's status flips to `completed`.
 
 ## Spoiler safety
 
-- Notes are private per member — your partner can never see them.
 - An essay is visible to the other person only **after both essays are submitted**. Until then, sealed essays show only a holding message.
-- A book's status flips to `completed` (and it enters the library) only when both essays are in.
+- A book's status flips to `completed` (and it enters the shelf) only when both essays are in.
 
 ## Identity model
 
@@ -43,7 +43,7 @@ The app picks its database at boot (see `db.py`):
 | No | **SQLite** at `DATABASE_PATH` (default `./data/bookclub.db`) | Local development — zero setup |
 | Yes | **Postgres** via `psycopg2` | Production on Render's free tier |
 
-Application code keeps writing SQLite-style SQL with `?` placeholders; `db.py` translates them to `%s` for Postgres, returns dict-like rows, and handles the small portability gaps (`SERIAL` vs `AUTOINCREMENT`, `RETURNING id` vs `lastrowid`, `ON CONFLICT DO NOTHING` vs `INSERT OR IGNORE`). Behavior — routes, gating, spoiler rules — is identical on both.
+Application code keeps writing SQLite-style SQL with `?` placeholders; `db.py` translates them to `%s` for Postgres, returns dict-like rows, and handles the small portability gaps (`SERIAL` vs `AUTOINCREMENT`, `RETURNING id` vs `lastrowid`, `ON CONFLICT DO NOTHING` vs `INSERT OR IGNORE`). Behavior — routes, essay states, spoiler rules — is identical on both.
 
 **Why Postgres on Render's free tier:** Render's filesystem is ephemeral, so a SQLite file would be wiped on every redeploy or restart. (Render's persistent disks require a paid instance type.) The free Postgres instance keeps the club's data safe across deploys — just paste its Internal Database URL into the `DATABASE_URL` env var at deploy time; it is never committed to the repo (`sync: false` in `render.yaml`).
 
@@ -91,11 +91,10 @@ docker run -p 8000:8000 -e SECRET_KEY=your-secret -v bookclub-data:/srv/data rea
 ## Data model
 
 - `members` — `id`, `name` (seeded: Robel, Bitania)
-- `books` — `id`, `title`, `author`, `chapters_total`, `recommended_by`, `status` (`reading`/`completed`), `created_at`
-- `progress` — `member_id`, `book_id`, `chapters_completed`
-- `chapter_notes` — `member_id`, `book_id`, `chapter`, `text`, `updated_at` (private per member)
-- `book_notes` — `member_id`, `book_id`, `text`, `updated_at` (private per member)
-- `essays` — `member_id`, `book_id`, `text`, `submitted_at`
+- `books` — `id`, `title`, `author`, `chapters_total` (vestigial, always 1 for new books), `recommended_by`, `status` (`reading`/`completed`), `created_at`, `cover_url`
+- `essays` — `member_id`, `book_id`, `text`, `submitted_at` (NULL = draft), `updated_at` (last draft checkpoint)
+
+The old `progress`, `chapter_notes`, and `book_notes` tables are dropped by a migration at boot.
 
 ## Routes
 
@@ -104,18 +103,16 @@ docker run -p 8000:8000 -e SECRET_KEY=your-secret -v bookclub-data:/srv/data rea
 | `GET /` | Dashboard (redirects to `/identity` if unknown) |
 | `GET/POST /identity` | "Who is reading?" gate / switch reader |
 | `GET/POST /book/add` | Shelve a new book |
-| `GET /book/<id>` | Book detail: chapters, notes, essay |
-| `POST /book/<id>/complete` | Mark the open chapter complete (gating enforced) |
-| `POST /book/<id>/chapter-note` | Autosave a chapter note (JSON) |
-| `POST /book/<id>/book-note` | Autosave the reading journal (JSON) |
-| `POST /book/<id>/essay` | Save essay draft or seal the essay |
-| `GET /library` | Finished volumes with both essays side by side |
+| `GET /book/<id>` | Book detail: the one ending essay |
+| `POST /book/<id>/essay` | Checkpoint an essay draft (`action=save`) or seal the essay (`action=submit`) |
+| `GET /shelf` | Finished volumes with both essays side by side |
+| `GET /library` | Redirects to `/shelf` (old name kept working) |
 
 ## Project structure
 
 ```
 book-club/
-├── app.py               # Flask app: routes, gating logic
+├── app.py               # Flask app: routes, essay state machine
 ├── db.py                # Database layer: SQLite by default, Postgres when DATABASE_URL is set
 ├── requirements.txt
 ├── Procfile             # gunicorn for Render/Railway/Heroku-style hosts
@@ -123,6 +120,6 @@ book-club/
 ├── Dockerfile
 ├── .gitignore
 ├── README.md
-├── templates/           # base, identity, dashboard, book, add_book, library
+├── templates/           # base, identity, dashboard, book, add_book, shelf
 └── static/style.css     # the parchment & ink theme
 ```

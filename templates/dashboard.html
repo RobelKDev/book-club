@@ -12,7 +12,7 @@
     <div class="clock-city">Addis Ababa</div>
     <div class="clock-time" id="clock-addis">&mdash;</div>
   </div>
-  <p class="clock-note">Miles apart, chapter by chapter.</p>
+  <p class="clock-note">Miles apart, book by book.</p>
 </section>
 
 {% if current %}
@@ -25,17 +25,8 @@
     <div class="book-hero-text">
       <h1 class="book-title"><a href="{{ url_for('book_detail', book_id=current.book.id) }}">{{ current.book.title }}</a></h1>
       <p class="book-author">{{ current.book.author }}</p>
-      <p class="book-meta">Chosen by {{ current.recommender }} &middot; {{ current.total }} chapters</p>
+      <p class="book-meta">Chosen by {{ current.recommender }}</p>
     </div>
-  </div>
-
-  <div class="progress-duo">
-    {% for p in current.progress %}
-    <div class="reader-progress">
-      <div class="reader-progress-head"><span>{{ p.name }}</span><span>{{ p.done }} / {{ current.total }}</span></div>
-      <div class="bar"><div class="bar-fill" style="width: {{ p.pct }}%"></div></div>
-    </div>
-    {% endfor %}
   </div>
 
   <div class="essay-status">
@@ -62,26 +53,22 @@
 {% else %}
 <section class="card empty-shelf">
   <h1>The shelf is bare.</h1>
-  <p class="lede">No book is open at the moment. Let the next chapter of the club begin &mdash; shelve your first volume.</p>
+  <p class="lede">No book is open at the moment. Let the next volume of the club begin &mdash; shelve your first book.</p>
   <a class="btn" href="{{ url_for('add_book') }}">Shelve a book</a>
 </section>
 {% endif %}
 
-<section class="card turn-card">
-  <p class="kicker">The turn to choose</p>
-  <p class="turn-line">It is <strong>{{ next_recommender.name }}&rsquo;s</strong> turn to recommend the next book.</p>
-  <a class="btn btn-ghost" href="{{ url_for('add_book') }}">Recommend a book</a>
-</section>
+<p class="turn-banner"><span class="turn-orn">&#10086;</span> It is <strong>{{ next_recommender.name }}&rsquo;s</strong> turn to choose &mdash; <a class="text-link" href="{{ url_for('add_book') }}">recommend a book &rarr;</a></p>
 
 {% if completed %}
 <section class="card">
   <p class="kicker">Finished volumes</p>
   <ul class="plain-list">
     {% for b in completed %}
-    <li><a href="{{ url_for('library') }}#book-{{ b.id }}">{{ b.title }}</a> <span class="muted">&mdash; {{ b.author }}</span></li>
+    <li><a href="{{ url_for('shelf') }}#book-{{ b.id }}">{{ b.title }}</a> <span class="muted">&mdash; {{ b.author }}</span></li>
     {% endfor %}
   </ul>
-  <a class="text-link" href="{{ url_for('library') }}">Enter the library &rarr;</a>
+  <a class="text-link" href="{{ url_for('shelf') }}">Browse the shelf &rarr;</a>
 </section>
 {% endif %}
 

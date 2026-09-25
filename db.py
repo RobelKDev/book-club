@@ -83,6 +83,12 @@ _MEMBER_SEED = (
 # savepoint-guarded attempt: already-applied migrations are ignored.
 _MIGRATIONS = (
     "ALTER TABLE books ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''",
+    # v2: chapters and the journal are gone — the club reads whole books now.
+    "DROP TABLE IF EXISTS progress",
+    "DROP TABLE IF EXISTS chapter_notes",
+    "DROP TABLE IF EXISTS book_notes",
+    # Track when an essay draft was last kept (checkpoint visibility).
+    "ALTER TABLE essays ADD COLUMN updated_at TEXT",
 )
 
 

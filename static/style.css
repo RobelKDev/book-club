@@ -292,26 +292,6 @@ input:focus, textarea:focus {
 .book-author { font-style: italic; color: var(--ink-soft); margin: 0.2rem 0; font-size: 1.2rem; }
 .book-meta { color: var(--muted); font-size: 1rem; margin: 0.2rem 0 0; }
 
-.progress-duo { margin: 1.2rem 0 0.4rem; display: grid; gap: 0.9rem; }
-.reader-progress-head {
-  display: flex; justify-content: space-between;
-  font-family: "Cormorant Garamond", serif; font-weight: 600; font-size: 1.1rem;
-  margin-bottom: 0.25rem;
-}
-.bar {
-  height: 10px;
-  background: var(--parchment-deep);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.bar-fill {
-  height: 100%;
-  background: linear-gradient(to right, var(--gold-soft), var(--gold));
-  border-radius: 999px;
-  transition: width 0.6s ease;
-}
-
 .essay-status { margin-top: 1rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .essay-status .kicker { margin: 0; }
 .essay-chip {
@@ -324,8 +304,20 @@ input:focus, textarea:focus {
 }
 .essay-chip.done { border-color: var(--gold); color: var(--oxblood); }
 
-.turn-card .turn-line { font-size: 1.25rem; }
-.turn-card .turn-line strong { color: var(--oxblood); }
+/* A slim highlight ribbon — whose turn it is to choose, without a whole card. */
+.turn-banner {
+  text-align: center;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.22rem;
+  font-style: italic;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--gold-soft);
+  border-bottom: 1px solid var(--gold-soft);
+  padding: 0.65rem 1rem;
+  margin: 1.8rem 0;
+}
+.turn-banner .turn-orn { color: var(--gold); font-style: normal; margin-right: 0.5rem; }
+.turn-banner strong { color: var(--oxblood); font-style: normal; }
 
 .plain-list { list-style: none; padding: 0; margin: 0.6rem 0; }
 .plain-list li {
@@ -338,42 +330,7 @@ input:focus, textarea:focus {
 .empty-shelf { text-align: center; }
 .empty-shelf h1 { font-style: italic; }
 
-/* ---------------- Tabs ---------------- */
-
-.tabs { display: none; }
-body.has-tabs .tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin: 0 0 1.2rem;
-  border-bottom: 2px solid var(--rule);
-}
-.tab {
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: 1.08rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  padding: 0.55rem 1rem 0.45rem;
-  cursor: pointer;
-}
-.tab:hover { color: var(--oxblood); }
-.tab.is-active {
-  color: var(--oxblood);
-  border-bottom-color: var(--oxblood);
-}
-.tab:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
-body.has-tabs .tab-panel { display: none; }
-body.has-tabs .tab-panel.is-active { display: block; }
-
-/* ---------------- Chapters ---------------- */
+/* ---------------- Sections ---------------- */
 
 .section-title {
   font-size: 1.5rem;
@@ -383,65 +340,11 @@ body.has-tabs .tab-panel.is-active { display: block; }
 }
 .rule-note { color: var(--muted); font-style: italic; font-size: 1.02rem; }
 
-.chapter-list { list-style: none; margin: 1rem 0 0; padding: 0; }
-.chapter {
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 0.9rem 1rem;
-  margin-bottom: 0.8rem;
-  background: rgba(244, 237, 218, 0.45);
-}
-.chapter-done { opacity: 0.92; }
-.chapter-locked { opacity: 0.62; background: rgba(236, 225, 196, 0.4); }
-
-.chapter-row {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-}
-.chapter-numeral {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.7rem;
-  font-weight: 700;
-  color: var(--oxblood);
-  min-width: 3.2rem;
-}
-.chapter-checks { display: flex; gap: 0.5rem; margin-right: auto; }
-.check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px; height: 44px;
-  border: 1px solid var(--gold);
-  border-radius: 50%;
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--muted);
-  background: var(--parchment);
-}
-.check.on {
-  background: var(--oxblood);
-  border-color: var(--oxblood-deep);
-  color: var(--parchment);
-}
-.chapter-action { margin: 0; }
-
 .chapter-note {
   margin: 0.6rem 0 0;
   font-style: italic;
   color: var(--ink-soft);
   font-size: 1.02rem;
-}
-
-.marginalia { margin-top: 0.8rem; }
-.marginalia label {
-  font-size: 1rem;
-  font-style: italic;
-  font-weight: 500;
-  color: var(--muted);
-  margin-bottom: 0.3rem;
 }
 
 /* ---------------- Essays ---------------- */
@@ -470,8 +373,8 @@ body.has-tabs .tab-panel.is-active { display: block; }
 
 /* ---------------- Library ---------------- */
 
-.library-head { text-align: center; }
-.library-book { margin-bottom: 1.5rem; }
+.shelf-head { text-align: center; }
+.shelf-book { margin-bottom: 1.5rem; }
 .essay-duo { display: grid; gap: 1.5rem; }
 @media (min-width: 720px) {
   .essay-duo { grid-template-columns: 1fr 1fr; }
@@ -489,12 +392,9 @@ body.has-tabs .tab-panel.is-active { display: block; }
   .motto { font-size: 2.3rem; }
   .card { padding: 1.8rem 2rem; }
   .btn { width: auto; min-width: 260px; }
-  .chapter-action { margin-left: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar-fill { transition: none; }
-}
 
 /* ---------------- Book covers & web lookup ---------------- */
 

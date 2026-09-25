@@ -39,7 +39,7 @@
     <nav class="topnav">
       <a href="{{ url_for('index') }}">Reading Room</a>
       <span class="nav-sep">&middot;</span>
-      <a href="{{ url_for('library') }}">Library</a>
+      <a href="{{ url_for('shelf') }}">Shelf</a>
       {% if me %}
       <span class="nav-sep">&middot;</span>
       <a href="{{ url_for('identity') }}" class="reader-link">&#10086; {{ me.name }} &mdash; change</a>
