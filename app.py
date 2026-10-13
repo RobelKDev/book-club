@@ -149,7 +149,10 @@ def search_books_online(query, limit=6):
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.load(resp)
-    except Exception:  # noqa: BLE001 - any lookup failure -> manual fallback
+    except Exception as exc:  # noqa: BLE001 - any lookup failure -> manual fallback
+        # Keep the real cause in the server log: the browser-side lookup is
+        # the primary path now, but this tells us if the server path heals.
+        print(f"book lookup failed: {type(exc).__name__}: {exc}", flush=True)
         return None
     results = []
     for doc in data.get("docs", [])[:limit]:

@@ -5,16 +5,17 @@
   <p class="kicker">A new volume</p>
   <h1>Shelve a book</h1>
   <p class="lede">Look the book up and its cover comes along &mdash; or enter it by hand below.</p>
-  <form method="get" action="{{ url_for('add_book') }}" class="lookup-form">
+  <form method="get" action="{{ url_for('add_book') }}" class="lookup-form" id="lookup-form">
     <div class="field">
       <label for="q">Find the book</label>
       <div class="lookup-row">
         <input type="text" id="q" name="q" value="{{ lookup_q }}" maxlength="200" placeholder="e.g. The Secret History Donna Tartt" autocomplete="off">
-        <button type="submit" class="btn btn-small">Look up</button>
+        <button type="submit" class="btn btn-small" id="lookup-btn">Look up</button>
       </div>
     </div>
   </form>
 
+  <div id="lookup-area">
   {% if lookup_failed %}
   <p class="muted"><em>The book lookup is unreachable right now &mdash; enter the book by hand below.</em></p>
   {% elif lookup_q %}
@@ -39,18 +40,17 @@
     <p class="muted"><em>No matches for &ldquo;{{ lookup_q }}&rdquo; &mdash; enter the book by hand below.</em></p>
     {% endif %}
   {% endif %}
+  </div>
 </section>
 
 <section class="card">
   <p class="kicker">By hand</p>
   <h2 class="section-title">The details</h2>
-  <form method="post" class="stack-form">
-    {% if prefill.cover_url %}
-    <div class="cover-preview">
-      <img src="{{ prefill.cover_url }}" alt="Chosen cover" loading="lazy">
+  <form method="post" class="stack-form" id="book-form">
+    <div class="cover-preview" id="cover-preview" {% if not prefill.cover_url %}hidden{% endif %}>
+      <img id="cover-preview-img" src="{{ prefill.cover_url }}" alt="Chosen cover" loading="lazy">
     </div>
-    {% endif %}
-    <input type="hidden" name="cover_url" value="{{ prefill.cover_url }}">
+    <input type="hidden" name="cover_url" id="cover_url" value="{{ prefill.cover_url }}">
     <div class="field">
       <label for="title">Title</label>
       <input type="text" id="title" name="title" required maxlength="200" value="{{ prefill.title }}" placeholder="e.g. The Brothers Karamazov" autocomplete="off">
@@ -74,4 +74,116 @@
     <button type="submit" class="btn">Place it on the shelf</button>
   </form>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // The lookup runs in the reader's own browser: Open Library answers
+  // browsers directly, while the server's shared cloud IP gets refused.
+  var form = document.getElementById("lookup-form");
+  var area = document.getElementById("lookup-area");
+  var input = document.getElementById("q");
+  var btn = document.getElementById("lookup-btn");
+  if (!form || !area || !input) return;
+
+  function note(text) {
+    area.innerHTML = "";
+    var p = document.createElement("p");
+    p.className = "muted";
+    var em = document.createElement("em");
+    em.textContent = text;
+    p.appendChild(em);
+    area.appendChild(p);
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function useThis(r) {
+    document.getElementById("title").value = r.title || "";
+    document.getElementById("author").value = r.author || "";
+    document.getElementById("cover_url").value = r.cover_url || "";
+    var wrap = document.getElementById("cover-preview");
+    var img = document.getElementById("cover-preview-img");
+    if (r.cover_url) {
+      img.src = r.cover_url;
+      wrap.hidden = false;
+    } else {
+      img.removeAttribute("src");
+      wrap.hidden = true;
+    }
+    document.getElementById("book-form").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("title").focus({ preventScroll: true });
+  }
+
+  function render(docs, q) {
+    area.innerHTML = "";
+    var results = [];
+    docs.forEach(function (d) {
+      var ci = d.cover_i;
+      results.push({
+        title: d.title || "Untitled",
+        author: (d.author_name || []).slice(0, 3).join(", "),
+        year: d.first_publish_year,
+        cover_url: ci ? "https://covers.openlibrary.org/b/id/" + ci + "-L.jpg" : "",
+        thumb_url: ci ? "https://covers.openlibrary.org/b/id/" + ci + "-M.jpg" : ""
+      });
+    });
+    if (!results.length) {
+      note("No matches for \u201C" + q + "\u201D \u2014 enter the book by hand below.");
+      return;
+    }
+    var list = el("div", "lookup-results");
+    results.forEach(function (r) {
+      var card = el("article", "result-card");
+      if (r.thumb_url) {
+        var img = el("img", "result-cover");
+        img.src = r.thumb_url;
+        img.alt = "Cover of " + r.title;
+        img.loading = "lazy";
+        card.appendChild(img);
+      } else {
+        var miss = el("div", "result-cover cover-missing");
+        miss.appendChild(el("span", null, "\u2766"));
+        card.appendChild(miss);
+      }
+      var info = el("div", "result-info");
+      info.appendChild(el("h3", "result-title", r.title));
+      info.appendChild(el("p", "result-author", r.author + (r.year ? " \u00B7 " + r.year : "")));
+      var b = el("button", "btn btn-small btn-ghost", "Use this");
+      b.type = "button";
+      b.addEventListener("click", function () { useThis(r); });
+      info.appendChild(b);
+      card.appendChild(info);
+      list.appendChild(card);
+    });
+    area.appendChild(list);
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var q = input.value.trim();
+    if (!q) return;
+    btn.disabled = true;
+    note("Looking in the stacks\u2026");
+    var url = "https://openlibrary.org/search.json?limit=6&fields=key,title,author_name,first_publish_year,cover_i&q=" + encodeURIComponent(q);
+    fetch(url, { headers: { "Accept": "application/json" } })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        return resp.json();
+      })
+      .then(function (data) { render(data.docs || [], q); })
+      .catch(function (err) {
+        if (window.console) console.error("Book lookup failed:", err);
+        note("The book lookup is unreachable right now \u2014 enter the book by hand below.");
+      })
+      .then(function () { btn.disabled = false; });
+  });
+})();
+</script>
 {% endblock %}
